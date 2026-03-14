@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: spring-claw
+  config:
+    import: optional:file:.env[.properties]
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    placeholders:
+      vector_dimensions: ${springclaw.vector.dimensions}
+
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      # 1. 这里是给聊天大脑配的
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:deepseek-r1:14b}
+      # 2. 这里是给向量翻译官配的，千万别和 chat 混在一个层级
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      pgvector:
+        initialize-schema: false  # 使用 Flyway 建表
+        dimensions: ${springclaw.vector.dimensions}
+
+springclaw:
+  vector:
+    dimensions: ${EMBEDDING_DIMENSIONS:768}

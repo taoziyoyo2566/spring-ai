@@ -1,0 +1,38 @@
+{
+  "groups": [
+    {
+      "name": "springclaw",
+      "type": "java.lang.Object",
+      "description": "Spring-Claw 自定义配置。"
+    },
+    {
+      "name": "springclaw.security",
+      "type": "java.lang.Object",
+      "description": "API HTTP Basic 认证用户名与密码。"
+    },
+    {
+      "name": "springclaw.vector",
+      "type": "java.lang.Object",
+      "description": "向量配置。"
+    }
+  ],
+  "properties": [
+    {
+      "name": "springclaw.security.username",
+      "type": "java.lang.String",
+      "description": "API Basic 认证用户名。",
+      "defaultValue": "springclaw"
+    },
+    {
+      "name": "springclaw.security.password",
+      "type": "java.lang.String",
+      "description": "API Basic 认证密码。"
+    },
+    {
+      "name": "springclaw.vector.dimensions",
+      "type": "java.lang.Integer",
+      "description": "向量维度。",
+      "defaultValue": 768
+    }
+  ]
+}
