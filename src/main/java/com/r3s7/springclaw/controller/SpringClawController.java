@@ -8,15 +8,17 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Validated
@@ -38,9 +40,8 @@ public class SpringClawController {
         this.chatClient = chatClientBuilder.build();
     }
 
-    @SuppressWarnings("null") // ChatClient.CallResponse.content() is declared nullable; we coalesce to ""
     @PostMapping(path = "/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
-    public String chat(@Valid @RequestBody ChatRequest request) {
+    public ResponseBodyEmitter chat(@Valid @RequestBody ChatRequest request) {
         long startNanos = System.nanoTime();
         String sessionId = request.sessionId();
         String userInput = request.userInput();
@@ -74,22 +75,50 @@ public class SpringClawController {
                 请结合这些记忆，回答用户的最新问题。
                 """.formatted(historyContext);
 
-        // 【4. 输出回答】调用模型思考并返回结果
-        String response = Optional.ofNullable(chatClient.prompt()
+        // 【4. 流式输出】调用模型并将结果逐步返回
+        ResponseBodyEmitter emitter = new ResponseBodyEmitter(0L);
+        StringBuilder responseBuffer = new StringBuilder();
+        chatClient.prompt()
                 .system(promptText)
                 .user(userInput)
-                .call()
-                .content()).orElse("");
-        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
-        log.info(
-                "chat request ok sessionId={} userInput={} memories={} response={} elapsedMs={}",
-                sessionId,
-                escapeForLog(userInput),
-                pastMemories.size(),
-                escapeForLog(response),
-                elapsedMs
-        );
-        return response;
+                .stream()
+                .content()
+                .subscribe(
+                        token -> {
+                            responseBuffer.append(token);
+                            try {
+                                emitter.send(token);
+                            } catch (IOException ex) {
+                                throw new UncheckedIOException(ex);
+                            }
+                        },
+                        ex -> {
+                            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                            log.warn(
+                                    "chat request failed sessionId={} userInput={} memories={} partialResponse={} elapsedMs={}",
+                                    sessionId,
+                                    escapeForLog(userInput),
+                                    pastMemories.size(),
+                                    escapeForLog(responseBuffer.toString()),
+                                    elapsedMs,
+                                    ex
+                            );
+                            emitter.completeWithError(ex);
+                        },
+                        () -> {
+                            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                            log.info(
+                                    "chat request ok sessionId={} userInput={} memories={} response={} elapsedMs={}",
+                                    sessionId,
+                                    escapeForLog(userInput),
+                                    pastMemories.size(),
+                                    escapeForLog(responseBuffer.toString()),
+                                    elapsedMs
+                            );
+                            emitter.complete();
+                        }
+                );
+        return emitter;
     }
 
     private static String escapeForLog(String value) {

@@ -1,9 +1,9 @@
 -- 创建 Spring AI PgVectorStore 所需的 vector_store 表
 -- 维度由 Flyway 占位符 vector_dimensions 决定（需与嵌入模型维度一致）
 CREATE TABLE IF NOT EXISTS vector_store (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     content text,
-    metadata json,
+    metadata jsonb,
     embedding vector(${vector_dimensions})
 );
 
